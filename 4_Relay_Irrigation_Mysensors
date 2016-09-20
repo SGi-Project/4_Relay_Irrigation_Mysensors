@@ -1,0 +1,168 @@
+/**
+   Based on the RelayWithButtonActuator sketch
+   MySensors Enabled
+   4 solenoid valves controlled via 4 relays and 4 buttons
+   V0.1 SGI 20-09-2016
+*/
+
+// Enable debug prints to serial monitor
+#define MY_DEBUG
+
+// Enable and select radio type attached
+#define MY_RADIO_NRF24
+//#define MY_RADIO_RFM69
+
+// Enabled repeater feature for this node
+//#define MY_REPEATER_FEATURE
+
+#include <SPI.h>
+#include <MySensors.h>
+#include <Bounce2.h>
+
+#define RELAY_ON 1
+#define RELAY_OFF 0
+
+#define SSR_A_ID 1   // Id of the sensor child
+#define SSR_B_ID 2   // Id of the sensor child
+#define SSR_C_ID 3   // Id of the sensor child
+#define SSR_D_ID 4   // Id of the sensor child
+
+const int buttonPinA = 1;
+const int buttonPinB = 2;
+const int buttonPinC = 3;
+const int buttonPinD = 4;
+const int relayPinA = 5;
+const int relayPinB = 6;
+const int relayPinC = 7;
+const int relayPinD = 8;
+int oldValueA = 0;
+int oldValueB = 0;
+int oldValueC = 0;
+int oldValueD = 0;
+bool stateA = false;
+bool stateB = false;
+bool stateC = false;
+bool stateD = false;
+
+Bounce debouncerA = Bounce();
+Bounce debouncerB = Bounce();
+Bounce debouncerC = Bounce();
+Bounce debouncerD = Bounce();
+
+MyMessage msgA(SSR_A_ID, V_STATUS);
+MyMessage msgB(SSR_B_ID, V_STATUS);
+MyMessage msgC(SSR_A_ID, V_STATUS);
+MyMessage msgD(SSR_B_ID, V_STATUS);
+
+void setup()
+{
+  // Setup the button Activate internal pull-up
+  pinMode(buttonPinA, INPUT_PULLUP); 
+  pinMode(buttonPinB, INPUT_PULLUP);
+  pinMode(buttonPinC, INPUT_PULLUP);
+  pinMode(buttonPinD, INPUT_PULLUP);
+
+  // After setting up the buttons, setup debouncer
+  debouncerA.attach(buttonPinA);
+  debouncerA.interval(5);
+  debouncerB.attach(buttonPinB);
+  debouncerB.interval(5);
+  debouncerC.attach(buttonPinC);
+  debouncerC.interval(5);
+  debouncerD.attach(buttonPinD);
+  debouncerD.interval(5);
+
+  // Make sure relays are off when starting up
+  digitalWrite(relayPinA, RELAY_OFF);
+  digitalWrite(relayPinB, RELAY_OFF);
+  digitalWrite(relayPinC, RELAY_OFF);
+  digitalWrite(relayPinD, RELAY_OFF);
+  
+  // Then set relay pins in output mode
+  pinMode(relayPinA, OUTPUT);
+  pinMode(relayPinB, OUTPUT);
+  pinMode(relayPinC, OUTPUT);
+  pinMode(relayPinD, OUTPUT);
+
+}
+
+void presentation()  
+{
+  // Send the sketch version information to the gateway and Controller
+  sendSketchInfo("Irrigation Controller 4 Valve", "1.0");
+
+  // Register all sensors to gw (they will be created as child devices)
+  present(SSR_A_ID, S_LIGHT);
+  present(SSR_B_ID, S_LIGHT);
+  present(SSR_C_ID, S_LIGHT);
+  present(SSR_D_ID, S_LIGHT);
+}
+
+
+void loop()
+{
+  debouncerA.update();
+  // Get the update value
+  int valueA = debouncerA.read();
+  if (valueA != oldValueA && valueA == 0) {
+    send(msgA.set(stateA ? false : true), true); // Send new state and request ack back
+  }
+  oldValueA = valueA;
+ 
+  debouncerB.update();
+  // Get the update value
+  int valueB = debouncerB.read();
+  if (valueB != oldValueB && valueB == 0) {
+    send(msgB.set(stateB ? false : true), true); // Send new state and request ack back
+  }
+  oldValueB = valueB;
+
+  debouncerC.update();
+  // Get the update value
+  int valueC = debouncerC.read();
+  if (valueC != oldValueC && valueC == 0) {
+    send(msgC.set(stateC ? false : true), true); // Send new state and request ack back
+  }
+  oldValueC = valueC;
+
+  debouncerD.update();
+  // Get the update value
+  int valueD = debouncerD.read();
+  if (valueD != oldValueD && valueD == 0) {
+    send(msgD.set(stateD ? false : true), true); // Send new state and request ack back
+  }
+  oldValueD = valueD;
+}
+
+void receive(const MyMessage &message) {
+// We only expect one type of message from controller. But we better check anyway.
+
+  if (message.type == V_STATUS) {
+    switch (message.sensor) {
+      case 1:
+        stateA = message.getBool();
+        digitalWrite(message.sensor + 4, stateA ? RELAY_ON : RELAY_OFF);
+        break;
+      case 2:
+        stateB = message.getBool();
+        digitalWrite(message.sensor + 4, stateB ? RELAY_ON : RELAY_OFF);
+        break;
+      case 3:
+        stateC = message.getBool();
+        digitalWrite(message.sensor + 4, stateC ? RELAY_ON : RELAY_OFF);
+        break;
+      case 4:
+        stateD = message.getBool();
+        digitalWrite(message.sensor + 4, stateD ? RELAY_ON : RELAY_OFF);
+        break;
+    }
+   
+// Write some debug info
+    Serial.print("Incoming change for sensor:");
+    Serial.println(message.sensor);
+    Serial.print("from node:");
+    Serial.println(message.sender);
+    Serial.print(", New status: ");
+    Serial.println(message.getBool());
+  }
+}
